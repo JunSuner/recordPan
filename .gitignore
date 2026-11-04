@@ -1,0 +1,4 @@
+# Test recordings pulled from the board (personal audio, regenerated with tools/pull_recordings.ps1)
+recordings/
+
+*.log

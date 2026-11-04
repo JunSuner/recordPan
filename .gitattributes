@@ -1,0 +1,3 @@
+# Keep LF in the repo and working copy (the iOS app is built on a Mac); PowerShell scripts keep CRLF.
+* text=auto eol=lf
+*.ps1 text eol=crlf

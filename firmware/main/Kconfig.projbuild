@@ -1,0 +1,138 @@
+menu "recordPan board"
+
+    menu "INMP441 microphone (I2S)"
+        config RP_MIC_SCK_GPIO
+            int "SCK (BCLK) GPIO"
+            default 4
+        config RP_MIC_WS_GPIO
+            int "WS (LRCLK) GPIO"
+            default 5
+        config RP_MIC_SD_GPIO
+            int "SD (data) GPIO"
+            default 6
+
+        config RP_MIC_DUAL
+            bool "Two microphones (stereo)"
+            default y
+            help
+                A second INMP441 shares SCK/WS/SD with the first and has L/R tied
+                to 3V3. Recordings become stereo WAV: left = first mic (L/R = GND),
+                right = second mic. Halves the recording time per MB.
+
+        choice RP_MIC_SLOT
+            prompt "Microphone slot"
+            depends on !RP_MIC_DUAL
+            default RP_MIC_SLOT_LEFT
+            help
+                INMP441 with L/R tied to GND outputs on the left slot.
+                Switch to right if recordings are silent.
+            config RP_MIC_SLOT_LEFT
+                bool "Left (L/R = GND)"
+            config RP_MIC_SLOT_RIGHT
+                bool "Right (L/R = VDD)"
+        endchoice
+
+        config RP_MIC_GAIN_SHIFT
+            int "Digital gain (left shift bits, 6dB each)"
+            range 0 6
+            default 3
+    endmenu
+
+    choice RP_REC_FORMAT
+        prompt "Recording format"
+        default RP_REC_FORMAT_OPUS
+        help
+            Opus (Ogg container, .opus) is ~20x smaller than WAV, so the 12 MB
+            flash partition holds about an hour instead of a few minutes.
+            With two mics, Opus stores their average (mono); WAV keeps both
+            channels, which is useful to check the mics.
+        config RP_REC_FORMAT_OPUS
+            bool "Opus (mono)"
+        config RP_REC_FORMAT_WAV
+            bool "WAV (16-bit PCM)"
+    endchoice
+
+    config RP_OPUS_BITRATE
+        int "Opus bitrate (bps)"
+        depends on RP_REC_FORMAT_OPUS
+        range 6000 64000
+        default 24000
+        help
+            24 kbps gives clear speech at ~10.8 MB per hour.
+
+    config RP_OPUS_COMPLEXITY
+        int "Opus encoder complexity"
+        depends on RP_REC_FORMAT_OPUS
+        range 0 10
+        default 5
+
+    choice RP_STORAGE
+        prompt "Recording storage"
+        default RP_STORAGE_FLASH
+        help
+            Where recordings are saved. The onboard flash needs no wiring but
+            holds only ~6 minutes of WAV; use the SD card once it has 3.3V power.
+        config RP_STORAGE_FLASH
+            bool "Onboard flash (12MB FAT partition)"
+        config RP_STORAGE_SD
+            bool "microSD card (SPI)"
+    endchoice
+
+    menu "microSD (SPI)"
+        depends on RP_STORAGE_SD
+        config RP_SD_CS_GPIO
+            int "CS GPIO"
+            default 10
+        config RP_SD_MOSI_GPIO
+            int "MOSI GPIO"
+            default 11
+        config RP_SD_SCK_GPIO
+            int "SCK GPIO"
+            default 12
+        config RP_SD_MISO_GPIO
+            int "MISO GPIO"
+            default 13
+        config RP_SD_FREQ_KHZ
+            int "SPI clock (kHz)"
+            default 20000
+            help
+                Lower this (e.g. 10000) if the card fails to mount with long wires.
+    endmenu
+
+    menu "OLED (SSD1306, I2C)"
+        config RP_OLED_SDA_GPIO
+            int "SDA GPIO"
+            default 41
+        config RP_OLED_SCL_GPIO
+            int "SCL (labelled SCK on some modules) GPIO"
+            default 42
+        config RP_OLED_FLIP
+            bool "Rotate 180 degrees"
+            default y
+    endmenu
+
+    menu "Buttons and LED"
+        config RP_BTN_REC_GPIO
+            int "Record button GPIO (to GND)"
+            default 0
+            help
+                GPIO0 is the onboard BOOT button, so no wiring is needed.
+        config RP_BTN_MARK_GPIO
+            int "Mark button GPIO (to GND)"
+            default 2
+        config RP_BUZZER_GPIO
+            int "Active buzzer GPIO (high = on, -1 = none)"
+            range -1 48
+            default 15
+            help
+                Beeps once when recording starts (inside the 200 ms the mic
+                warm-up discards, so it isn't recorded), twice after it stops,
+                and long on errors. Marks don't beep, as that would be recorded.
+        config RP_LED_GPIO
+            int "Onboard WS2812 RGB LED GPIO"
+            default 48
+            help
+                ESP32-S3-DevKitC-1 v1.0 uses GPIO48, some v1.1 boards use GPIO38.
+    endmenu
+
+endmenu
