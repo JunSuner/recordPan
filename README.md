@@ -10,6 +10,7 @@
 - 📦 **Opus 压缩**：录音存为 Ogg Opus，24 kbps，每小时约 10.8 MB。板载 12 MB Flash 能录将近 1 小时。也可以切换成 WAV。
 - 🔖 **标记键**：录音时按一下就打一个时间标记，结束后和时长一起写进同名的 `.json` 文件，供 App 使用。
 - 🖥️ **OLED 状态屏**：显示录音计时、剩余可录时间、音量条，还有一只会动的 Clawd。待机时会晃动、眨眼，久了会睡着；有人说话时会跟着蹦跳；打标记时会举手欢呼。
+- 📶 **蓝牙**：手机可以通过 BLE 开始/停止录音、打标记、查看状态和文件列表，录音时实时收到 Opus 音频流（协议见 [docs/BLE.md](docs/BLE.md)）。
 - 🔔 **提示**：RGB LED 显示状态，有源蜂鸣器在开始和停止时提示。提示音不会被录进去。
 
 ## 硬件
@@ -41,8 +42,8 @@ iPhone ◄─Wi-Fi─ 批量下载录音（M5）
 |---|---|---|
 | M1 | I2S 采集、写 WAV、按键、LED | ✅ 完成 |
 | M2 | Opus 编码、OLED、标记键、蜂鸣器、元数据文件 | ✅ 完成 |
-| M3 | 固件 BLE：控制、状态、文件列表、实时音频流 | ⏳ 下一步 |
-| M4 | iOS App：连接设备、控制录音、边录边转文字 | — |
+| M3 | 固件 BLE：控制、状态、文件列表、实时音频流 | ✅ 完成 |
+| M4 | iOS App：连接设备、控制录音、边录边转文字 | ⏳ 下一步 |
 | M5 | Wi-Fi 批量同步、录音列表、播放、离线转写 | — |
 | M6 | 联调、外壳造型、演示视频与文档 | — |
 
@@ -53,6 +54,8 @@ iPhone ◄─Wi-Fi─ 批量下载录音（M5）
 | [docs/PLAN.md](docs/PLAN.md) | 方案：选型、引脚分配、数据流、里程碑 |
 | [firmware/](firmware/) | ESP-IDF v6.1 固件（C） |
 | [tools/pull_recordings.ps1](tools/pull_recordings.ps1) | 从板子的 Flash 取出录音文件 |
+| [tools/ble_test.py](tools/ble_test.py) | 电脑端蓝牙测试：控制录音、收实时音频 |
+| [docs/BLE.md](docs/BLE.md) | 蓝牙协议 |
 | `ios/` | iOS App（Swift / SwiftUI，M4 开始） |
 
 ## 快速开始

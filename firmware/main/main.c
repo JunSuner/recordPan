@@ -1,3 +1,4 @@
+#include "ble_service.h"
 #include "buttons.h"
 #include "buzzer.h"
 #include "display.h"
@@ -5,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "led.h"
+#include "nvs_flash.h"
 #include "recorder.h"
 #include "storage.h"
 
@@ -16,10 +18,12 @@ static void toggle_recording(void)
         recorder_stop();
         led_set_state(LED_IDLE);
         buzzer_play(BUZZER_STOP);  // after capture has stopped, so it isn't recorded
+        ble_service_status_changed();
     } else if (recorder_start() == ESP_OK) {
         // The first 200 ms after start are discarded as mic warm-up, so this beep isn't recorded.
         buzzer_play(BUZZER_START);
         led_set_state(LED_RECORDING);
+        ble_service_status_changed();
     } else {
         led_set_state(LED_ERROR);
         buzzer_play(BUZZER_ERROR);
@@ -28,7 +32,7 @@ static void toggle_recording(void)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "recordPan M2: press REC to start/stop, MARK to add a mark");
+    ESP_LOGI(TAG, "recordPan M3: press REC to start/stop, MARK to add a mark");
 
     led_init();
     buzzer_init();
@@ -36,6 +40,17 @@ void app_main(void)
     QueueHandle_t events = xQueueCreate(8, sizeof(btn_event_t));
     buttons_init(events);
     ESP_ERROR_CHECK(recorder_init());
+
+    // BLE stores its keys in NVS.
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
+    if (ble_service_init(events) == ESP_OK) {
+        recorder_set_packet_cb(ble_service_audio_packet);
+    }
 
     // A missing card isn't fatal: pressing REC retries the mount.
     led_set_state(storage_mount() == ESP_OK ? LED_IDLE : LED_ERROR);
@@ -50,6 +65,7 @@ void app_main(void)
             case BTN_EVT_MARK:
                 if (recorder_mark() >= 0) {
                     led_flash();
+                    ble_service_status_changed();
                 }
                 break;
             }

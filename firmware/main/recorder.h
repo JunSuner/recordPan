@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
 
@@ -33,3 +34,8 @@ const char *recorder_file_name(void);
 
 // Channels stored in the audio file (Opus is always mono).
 int recorder_file_channels(void);
+
+// Called from the writer task with every encoded Opus packet (20 ms each) and its
+// frame index since the recording started. Not called in WAV mode.
+typedef void (*recorder_packet_cb_t)(const uint8_t *packet, size_t len, uint32_t frame);
+void recorder_set_packet_cb(recorder_packet_cb_t cb);

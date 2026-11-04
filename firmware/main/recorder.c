@@ -52,6 +52,8 @@ static EventGroupHandle_t s_events;
 #define OPUS_MAX_PACKET 1276
 static ogg_opus_t s_ogg;
 static void *s_opus;
+static uint32_t s_encoded_frames;
+static recorder_packet_cb_t s_packet_cb;
 #else
 #define FILE_EXT "wav"
 static FILE *s_file;
@@ -207,6 +209,7 @@ static esp_err_t sink_open(const char *path)
         ESP_LOGE(TAG, "Opus encoder init failed");
         return ESP_FAIL;
     }
+    s_encoded_frames = 0;
     if (!ogg_opus_open(&s_ogg, path, RECORDER_SAMPLE_RATE, 1, OPUS_PRE_SKIP)) {
         esp_opus_enc_close(s_opus);
         s_opus = NULL;
@@ -233,6 +236,10 @@ static bool sink_write(const int16_t *pcm)
     if (esp_opus_enc_process(s_opus, &in, &out) != ESP_AUDIO_ERR_OK) {
         return false;
     }
+    if (s_packet_cb) {
+        s_packet_cb(packet, out.encoded_bytes, s_encoded_frames);
+    }
+    s_encoded_frames++;
     return ogg_opus_write(&s_ogg, packet, out.encoded_bytes, FRAME_SAMPLES * 48000 / RECORDER_SAMPLE_RATE);
 }
 
@@ -464,5 +471,12 @@ int recorder_file_channels(void)
     return 1;
 #else
     return CHANNELS;
+#endif
+}
+
+void recorder_set_packet_cb(recorder_packet_cb_t cb)
+{
+#if CONFIG_RP_REC_FORMAT_OPUS
+    s_packet_cb = cb;
 #endif
 }
