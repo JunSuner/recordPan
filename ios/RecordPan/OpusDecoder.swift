@@ -46,7 +46,8 @@ final class OpusDecoder {
         return out
     }
 
-    private func decode(_ packet: Data) -> AVAudioPCMBuffer? {
+    /// Decodes one 20 ms packet (decoder state carries over between calls).
+    func decode(_ packet: Data) -> AVAudioPCMBuffer? {
         let compressed = AVAudioCompressedBuffer(format: opusFormat, packetCapacity: 1,
                                                  maximumPacketSize: max(packet.count, 1))
         packet.withUnsafeBytes { compressed.data.copyMemory(from: $0.baseAddress!, byteCount: packet.count) }

@@ -15,6 +15,7 @@ final class BLEManager: NSObject, ObservableObject {
     @Published private(set) var link: Link = .bluetoothOff
     @Published private(set) var status: DeviceStatus?
     @Published private(set) var files: [RecordingFile] = []
+    @Published private(set) var wifi: WiFiCredentials?
 
     /// Called with every audio notification while recording.
     var onAudio: ((AudioChunk) -> Void)?
@@ -37,6 +38,13 @@ final class BLEManager: NSObject, ObservableObject {
     func send(_ command: RP.Command) {
         guard let peripheral, let control = characteristics[RP.control] else { return }
         peripheral.writeValue(Data([command.rawValue]), for: control, type: .withResponse)
+    }
+
+    /// Deletes a recording (and its metadata) on the device.
+    func delete(_ name: String) {
+        guard let peripheral, let control = characteristics[RP.control] else { return }
+        peripheral.writeValue(Data([RP.Command.delete.rawValue]) + Data(name.utf8), for: control, type: .withResponse)
+        files.removeAll { $0.name == name }
     }
 
     func refreshFiles() {
@@ -95,7 +103,7 @@ extension BLEManager: CBCentralManagerDelegate {
 extension BLEManager: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         for service in peripheral.services ?? [] where service.uuid == RP.service {
-            peripheral.discoverCharacteristics([RP.control, RP.status, RP.files, RP.audio], for: service)
+            peripheral.discoverCharacteristics([RP.control, RP.status, RP.files, RP.audio, RP.wifi], for: service)
         }
     }
 
@@ -103,7 +111,9 @@ extension BLEManager: CBPeripheralDelegate {
                     error: Error?) {
         for c in service.characteristics ?? [] {
             characteristics[c.uuid] = c
-            if c.uuid != RP.control {
+            if c.uuid == RP.wifi {
+                peripheral.readValue(for: c)
+            } else if c.uuid != RP.control {
                 peripheral.setNotifyValue(true, for: c)
             }
         }
@@ -141,6 +151,8 @@ extension BLEManager: CBPeripheralDelegate {
             } else if let name = String(data: data.dropFirst(4), encoding: .utf8) {
                 incomingFiles.append(RecordingFile(name: name, size: size))
             }
+        case RP.wifi:
+            wifi = WiFiCredentials(data)
         case RP.audio:
             if let chunk = AudioChunk(data) {
                 onAudio?(chunk)

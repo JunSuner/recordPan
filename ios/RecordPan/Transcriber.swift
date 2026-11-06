@@ -71,3 +71,50 @@ final class Transcriber: ObservableObject {
         tasks.append(task)
     }
 }
+
+/// Transcribes a finished recording, 50 s at a time, as fast as the recognizer allows.
+enum OfflineTranscriber {
+    enum Failure: Error {
+        case unavailable
+    }
+
+    static func transcribe(_ pcm: AVAudioPCMBuffer, progress: @escaping (Double) -> Void) async throws -> String {
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN")), recognizer.isAvailable else {
+            throw Failure.unavailable
+        }
+        let segments = OggOpus.chunks(of: pcm, frames: AVAudioFrameCount(50 * RP.sampleRate))
+        var text = ""
+        for (i, segment) in segments.enumerated() {
+            text += await transcribeSegment(segment, with: recognizer)
+            progress(Double(i + 1) / Double(segments.count))
+        }
+        return text
+    }
+
+    private static func transcribeSegment(_ pcm: AVAudioPCMBuffer, with recognizer: SFSpeechRecognizer) async
+        -> String {
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = false
+        request.addsPunctuation = true
+        if recognizer.supportsOnDeviceRecognition {
+            request.requiresOnDeviceRecognition = true
+        }
+        for piece in OggOpus.chunks(of: pcm, frames: AVAudioFrameCount(RP.sampleRate)) {
+            request.append(piece)
+        }
+        request.endAudio()
+        return await withCheckedContinuation { continuation in
+            var done = false
+            _ = recognizer.recognitionTask(with: request) { result, error in
+                guard !done else { return }
+                if let result, result.isFinal {
+                    done = true
+                    continuation.resume(returning: result.bestTranscription.formattedString)
+                } else if error != nil {
+                    done = true  // e.g. a silent segment: nothing recognized
+                    continuation.resume(returning: result?.bestTranscription.formattedString ?? "")
+                }
+            }
+        }
+    }
+}

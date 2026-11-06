@@ -169,7 +169,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = recordPan;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "从录音笔的 Wi-Fi 热点下载录音。";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "连接 recordPan 录音笔，控制录音并接收实时音频。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "把录音笔传来的语音实时转成文字。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -196,7 +198,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = recordPan;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "从录音笔的 Wi-Fi 热点下载录音。";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "连接 recordPan 录音笔，控制录音并接收实时音频。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "把录音笔传来的语音实时转成文字。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -9,6 +9,7 @@
 #include "nvs_flash.h"
 #include "recorder.h"
 #include "storage.h"
+#include "wifi_sync.h"
 
 static const char *TAG = "main";
 
@@ -32,7 +33,7 @@ static void toggle_recording(void)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "recordPan M3: press REC to start/stop, MARK to add a mark");
+    ESP_LOGI(TAG, "recordPan M5: press REC to start/stop, MARK to add a mark");
 
     led_init();
     buzzer_init();
@@ -48,6 +49,9 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+    if (wifi_sync_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Wi-Fi init failed; bulk download unavailable");
+    }
     if (ble_service_init(events) == ESP_OK) {
         recorder_set_packet_cb(ble_service_audio_packet);
     }

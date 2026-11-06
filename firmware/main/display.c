@@ -14,6 +14,7 @@
 #include "recorder.h"
 #include "sdkconfig.h"
 #include "storage.h"
+#include "wifi_sync.h"
 
 #define WIDTH       128
 #define HEIGHT      64
@@ -216,6 +217,9 @@ static void render(uint64_t free_bytes, bool show_mark, bool blink, const clawd_
         draw_text(9, 0, "REC", 1, true);
     } else {
         draw_text(0, 0, "READY", 1, true);
+    }
+    if (wifi_sync_is_on()) {
+        draw_text(48, 0, "WiFi", 1, true);
     }
     if (storage_is_mounted()) {
         format_remaining(buf, sizeof(buf), free_bytes);

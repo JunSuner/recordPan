@@ -12,12 +12,16 @@ enum RP {
     static let status = uuid(3)
     static let files = uuid(4)
     static let audio = uuid(5)
+    static let wifi = uuid(6)
 
     enum Command: UInt8 {
         case start = 0x01
         case stop = 0x02
         case mark = 0x03
         case listFiles = 0x04
+        case wifiOn = 0x05
+        case wifiOff = 0x06
+        case delete = 0x07  // followed by the file name
     }
 
     /// Opus frame length used by the device.
@@ -47,6 +51,7 @@ struct DeviceStatus: Equatable {
     var elapsedMs: Int
     var freeKB: Int
     var peakDb: Int
+    var wifiOn: Bool
 
     init?(_ d: Data) {
         guard d.count >= 13, d[d.startIndex] == 1, let state = State(rawValue: d[d.startIndex + 1]) else {
@@ -57,10 +62,24 @@ struct DeviceStatus: Equatable {
         elapsedMs = d.u32(at: 4)
         freeKB = d.u32(at: 8)
         peakDb = Int(Int8(bitPattern: d[d.startIndex + 12]))
+        wifiOn = d.count > 13 && d[d.startIndex + 13] & 0x01 != 0
     }
 
     /// Remaining recording time at 24 kbps Opus (~3 KB/s).
     var remainingMinutes: Int { freeKB / 3 / 60 }
+}
+
+/// SoftAP credentials from the Wi-Fi characteristic: SSID, password and IP, one per line.
+struct WiFiCredentials: Equatable {
+    let ssid: String
+    let password: String
+    let host: String
+
+    init?(_ d: Data) {
+        let parts = String(decoding: d, as: UTF8.self).split(whereSeparator: \.isNewline).map(String.init)
+        guard parts.count == 3 else { return nil }
+        (ssid, password, host) = (parts[0], parts[1], parts[2])
+    }
 }
 
 struct RecordingFile: Identifiable, Hashable {

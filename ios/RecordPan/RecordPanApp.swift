@@ -6,8 +6,15 @@ struct RecordPanApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(model)
+            TabView {
+                Tab("录音笔", systemImage: "mic.fill") {
+                    ContentView()
+                }
+                Tab("录音库", systemImage: "list.bullet.rectangle") {
+                    LibraryView()
+                }
+            }
+            .environmentObject(model)
         }
     }
 }

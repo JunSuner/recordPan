@@ -11,6 +11,7 @@
 | Status 状态 | `6a2e0003-8b1f-4c3e-9d2a-7265636f7264` | Read / Notify |
 | Files 文件列表 | `6a2e0004-8b1f-4c3e-9d2a-7265636f7264` | Notify |
 | Audio 实时音频 | `6a2e0005-8b1f-4c3e-9d2a-7265636f7264` | Notify |
+| Wi-Fi 热点信息 | `6a2e0006-8b1f-4c3e-9d2a-7265636f7264` | Read |
 
 ## Control：写入 1 字节命令
 
@@ -20,6 +21,9 @@
 | STOP | `0x02` | 停止录音（没在录音时忽略） |
 | MARK | `0x03` | 打一个标记（只在录音时有效） |
 | LIST_FILES | `0x04` | 通过 Files 特征值返回录音文件列表 |
+| WIFI_ON | `0x05` | 打开 Wi-Fi 热点和文件服务，见 [WIFI.md](WIFI.md) |
+| WIFI_OFF | `0x06` | 关闭 Wi-Fi |
+| DELETE | `0x07` + 文件名 | 删除录音和它的 `.json`（例如 `07 52 45 43 5F …` 即 `REC_…`）；正在录的文件不能删 |
 
 蓝牙命令和设备上的实体按键走同一套处理流程，所以 LED、蜂鸣器、OLED 的反应都一样。
 
@@ -35,7 +39,11 @@
 | 4 | u32 | 已录时长（毫秒），待机时为 0 |
 | 8 | u32 | 剩余存储空间（KB） |
 | 12 | i8 | 最近 20 ms 的输入峰值（dBFS），-96 表示静音 |
-| 13 | u8 | 保留 |
+| 13 | u8 | flags：bit 0 = Wi-Fi 已打开 |
+
+## Wi-Fi：热点信息
+
+读取后得到三行 UTF-8 文本：SSID、密码、IP，例如 `recordPan-FF92` / `k3mx…` / `192.168.4.1`。密码每次开机随机生成。
 
 ## Files：文件列表
 
@@ -46,7 +54,7 @@
 | 0 | u32 | 文件大小（字节） |
 | 4 | UTF-8 | 文件名，例如 `REC_0009.opus`，长度为通知长度减 4 |
 
-列表推送完后，再推送一条只有 4 字节、内容为 `FF FF FF FF` 的通知，表示列表结束。每个录音还有一个同名的 `.json` 元数据文件，格式见 [firmware/README.md](../firmware/README.md)，会在 M5 通过 Wi-Fi 和录音一起下载。
+列表推送完后，再推送一条只有 4 字节、内容为 `FF FF FF FF` 的通知，表示列表结束。每个录音还有一个同名的 `.json` 元数据文件，格式见 [firmware/README.md](../firmware/README.md)，通过 Wi-Fi 和录音一起下载（见 [WIFI.md](WIFI.md)）。
 
 ## Audio：实时音频流
 

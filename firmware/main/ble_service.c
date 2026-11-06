@@ -16,6 +16,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "storage.h"
+#include "wifi_sync.h"
 
 #define STATUS_VERSION      1
 #define STATUS_INTERVAL_MS  1000
@@ -28,6 +29,9 @@ enum {
     CMD_STOP = 0x02,
     CMD_MARK = 0x03,
     CMD_LIST_FILES = 0x04,
+    CMD_WIFI_ON = 0x05,
+    CMD_WIFI_OFF = 0x06,
+    CMD_DELETE = 0x07,  // followed by the file name
 };
 
 static const char *TAG = "ble";
@@ -40,8 +44,9 @@ static const ble_uuid128_t s_control_uuid = RP_UUID(0x02);
 static const ble_uuid128_t s_status_uuid = RP_UUID(0x03);
 static const ble_uuid128_t s_files_uuid = RP_UUID(0x04);
 static const ble_uuid128_t s_audio_uuid = RP_UUID(0x05);
+static const ble_uuid128_t s_wifi_uuid = RP_UUID(0x06);
 
-static uint16_t s_status_handle, s_files_handle, s_audio_handle;
+static uint16_t s_status_handle, s_files_handle, s_audio_handle, s_wifi_handle;
 static QueueHandle_t s_app_events;
 static QueueHandle_t s_worker_cmds;  // commands handled outside the NimBLE host task
 static uint8_t s_own_addr_type;
@@ -58,7 +63,7 @@ static void advertise(void);
 
 static size_t build_status(uint8_t *b)
 {
-    // Little-endian: version, state, marks, elapsed_ms, free_kb, peak_db, reserved
+    // Little-endian: version, state, marks, elapsed_ms, free_kb, peak_db, flags (bit 0: Wi-Fi on)
     uint8_t state = !storage_is_mounted() ? 2 : (recorder_is_recording() ? 1 : 0);
     uint16_t marks = recorder_mark_count();
     uint32_t elapsed = recorder_is_recording() ? recorder_elapsed_ms() : 0;
@@ -69,7 +74,7 @@ static size_t build_status(uint8_t *b)
     memcpy(b + 4, &elapsed, 4);
     memcpy(b + 8, &free_kb, 4);
     b[12] = (uint8_t)(int8_t)recorder_peak_db();
-    b[13] = 0;
+    b[13] = wifi_sync_is_on() ? 0x01 : 0;
     return 14;
 }
 
@@ -128,6 +133,12 @@ static void worker_task(void *arg)
                 send_file_list();
                 continue;
             }
+            // Starting/stopping Wi-Fi blocks for a while, so it runs here, not in the host task.
+            if (cmd == CMD_WIFI_ON && wifi_sync_start() != ESP_OK) {
+                ESP_LOGE(TAG, "Wi-Fi start failed");
+            } else if (cmd == CMD_WIFI_OFF) {
+                wifi_sync_stop();
+            }
         }
         // Periodic (or requested) status update.
         if (s_status_sub) {
@@ -148,12 +159,19 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt 
         uint8_t b[16];
         return os_mbuf_append(ctxt->om, b, build_status(b)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR && attr == s_wifi_handle) {
+        const char *cred = wifi_sync_credentials();
+        return os_mbuf_append(ctxt->om, cred, strlen(cred)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
     if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
-        uint8_t cmd;
+        uint8_t msg[48];
         uint16_t len;
-        if (OS_MBUF_PKTLEN(ctxt->om) < 1 || ble_hs_mbuf_to_flat(ctxt->om, &cmd, 1, &len) != 0) {
+        if (OS_MBUF_PKTLEN(ctxt->om) < 1 || OS_MBUF_PKTLEN(ctxt->om) >= sizeof(msg) ||
+            ble_hs_mbuf_to_flat(ctxt->om, msg, sizeof(msg) - 1, &len) != 0) {
             return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
         }
+        msg[len] = 0;
+        uint8_t cmd = msg[0];
         ESP_LOGI(TAG, "Command 0x%02x", cmd);
         switch (cmd) {
         case CMD_START:
@@ -170,7 +188,14 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt 
             post_button(BTN_EVT_MARK);
             return 0;
         case CMD_LIST_FILES:
+        case CMD_WIFI_ON:
+        case CMD_WIFI_OFF:
             xQueueSend(s_worker_cmds, &cmd, 0);
+            return 0;
+        case CMD_DELETE:
+            if (wifi_sync_delete_recording((const char *)msg + 1) != ESP_OK) {
+                return BLE_ATT_ERR_UNLIKELY;
+            }
             return 0;
         default:
             return BLE_ATT_ERR_REQ_NOT_SUPPORTED;
@@ -206,6 +231,12 @@ static const struct ble_gatt_svc_def s_services[] = {
                 .access_cb = chr_access,
                 .flags = BLE_GATT_CHR_F_NOTIFY,
                 .val_handle = &s_audio_handle,
+            },
+            {
+                .uuid = &s_wifi_uuid.u,
+                .access_cb = chr_access,
+                .flags = BLE_GATT_CHR_F_READ,
+                .val_handle = &s_wifi_handle,
             },
             {0},
         },
